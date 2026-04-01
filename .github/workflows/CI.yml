@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v5.0.4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.cache/pip
+          key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+          enableCrossOsArchive: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          export PATH="$HOME/.local/bin:$PATH"
+          poetry install
+
+      # ---- Quality Gates ----
+      - name: Code formatting check (black)
+        run: poetry run black --check src/
+
+      - name: Style conformance (ruff)
+        run: poetry run ruff check src/
+
+      - name: Type checking (mypy)
+        run: poetry run mypy src/
+
+      - name: Cyclomatic complexity (radon)
+        run: poetry run radon cc -a -s src/
+
+      - name: Maintainability index (radon)
+        run: poetry run radon mi -s src/
+
+      - name: Unit tests and coverage
+        run: poetry run pytest --cov=src --cov-fail-under=80
+
+      - name: Security code analysis (bandit)
+        run: poetry run bandit -r src/
+
+      - name: Security dependencies (pip-audit)
+        run: poetry run pip-audit
+
+      - name: Documentation (interrogate)
+        run: poetry run interrogate -vv src/
+
+      # ---- Optional Performance Test (locust) ----
+      - name: Performance test (locust)
+        run: |
+          if [ -f locustfile.py ]; then
+            poetry run locust -f locustfile.py --headless -u 10 -r 1 -t 1m
+          else
+            echo "No locustfile.py found, skipping performance test."
+          fi
+
+      # ---- Swagger UI check (FastAPI endpoints) ----
+      - name: Swagger endpoint check
+        run: |
+          python - <<EOF
+          import requests
+          url = "http://127.0.0.1:8000/docs/json"
+          try:
+              resp = requests.get(url)
+              assert resp.status_code == 200, "Swagger JSON not available"
+              data = resp.json()
+              assert "paths" in data and data["paths"], "No endpoints documented"
+          except Exception as e:
+              print(e)
+              exit(1)
+          EOF
