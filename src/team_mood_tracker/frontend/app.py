@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 import streamlit as st
+from pydantic import ValidationError
 
 from team_mood_tracker.frontend.api_client import ApiClientError, MoodApiClient
 from team_mood_tracker.frontend.presenters import (
@@ -15,6 +16,7 @@ from team_mood_tracker.frontend.presenters import (
     mood_options,
     parse_mood,
     range_to_dates,
+    trend_chart,
     trend_frame,
 )
 from team_mood_tracker.shared.config import get_settings
@@ -119,7 +121,7 @@ def _render_user_trend(
     if data.empty:
         st.info("No history for this user yet.")
         return
-    st.line_chart(data.set_index("Date"))
+    st.altair_chart(trend_chart(user_trends), use_container_width=True)
 
 
 def _load_existing_entry(  # pragma: no cover
@@ -217,7 +219,7 @@ def _render_team_charts(  # pragma: no cover
         if trend_data.empty:
             st.info("No trend data yet. Submit the first check-in.")
         else:
-            st.line_chart(trend_data.set_index("Date"))
+            st.altair_chart(trend_chart(trends), use_container_width=True)
     with distribution_column:
         st.markdown("#### Mood Distribution")
         distribution_data = distribution_frame(distribution)
@@ -266,10 +268,10 @@ def _save_entry(  # pragma: no cover
 ) -> None:
     """Persist the submitted entry and report the outcome."""
 
-    payload = EntryCreateRequest(user=user_name, mood=mood, comment=comment)
     try:
+        payload = EntryCreateRequest(user=user_name, mood=mood, comment=comment)
         response = client.save_entry(payload)
-    except (ApiClientError, ValueError) as error:
+    except (ApiClientError, ValidationError, ValueError) as error:
         st.error(str(error))
         return
     verb = "updated" if response.action == "updated" else "saved"

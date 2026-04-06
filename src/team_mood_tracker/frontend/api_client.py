@@ -160,7 +160,10 @@ def _clean_params(**params: str | None) -> dict[str, str]:
 def _extract_error_detail(response: httpx.Response) -> str:
     """Extract the most useful detail from an error response."""
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except ValueError:
+        return "The server returned an unexpected error."
     detail = payload.get("detail")
     if isinstance(detail, str):
         return detail

@@ -115,6 +115,31 @@ def test_api_client_surfaces_server_and_network_errors(monkeypatch: pytest.Monke
         client.get_summary(date_from=date(2026, 4, 1), date_to=date(2026, 4, 6))
 
 
+def test_api_client_handles_non_json_error_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The API client should tolerate non-JSON error responses."""
+
+    def html_error(
+        self: httpx.Client,
+        method: str,
+        url: str,
+        json: dict[str, object] | None = None,
+        params: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        request = httpx.Request(method, url, json=json, params=params)
+        return httpx.Response(
+            500,
+            text="<html><body>broken</body></html>",
+            headers={"content-type": "text/html"},
+            request=request,
+        )
+
+    monkeypatch.setattr(httpx.Client, "request", html_error)
+    client = MoodApiClient(base_url="http://localhost:8000")
+
+    with pytest.raises(ApiClientError, match="unexpected error"):
+        client.get_summary(date_from=date(2026, 4, 1), date_to=date(2026, 4, 6))
+
+
 def test_api_client_builds_query_params(monkeypatch: pytest.MonkeyPatch) -> None:
     """The API client should pass date filters and sorting parameters through."""
 

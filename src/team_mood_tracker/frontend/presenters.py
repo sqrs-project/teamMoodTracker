@@ -56,6 +56,22 @@ def trend_frame(trends: TrendsResponse) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def trend_chart(trends: TrendsResponse) -> alt.Chart:
+    """Build a fixed-scale line chart for mood trends."""
+
+    data = trend_frame(trends)
+    return (
+        alt.Chart(data)
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("Date:N", title="Date"),
+            y=alt.Y("Score:Q", scale=alt.Scale(domain=[0, 3]), title="Mood Score"),
+            tooltip=["Date:N", "Score:Q"],
+        )
+        .properties(height=320)
+    )
+
+
 def distribution_frame(distribution: DistributionResponse) -> pd.DataFrame:
     """Convert mood distribution into a dataframe for charting."""
 

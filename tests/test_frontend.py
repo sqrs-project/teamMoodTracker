@@ -12,6 +12,7 @@ from team_mood_tracker.frontend.presenters import (
     mood_options,
     parse_mood,
     range_to_dates,
+    trend_chart,
     trend_frame,
 )
 from team_mood_tracker.shared.constants import Mood
@@ -56,11 +57,13 @@ def test_presenters_build_expected_dataframes() -> None:
     entries_data = entries_frame(entries)
     trend_data = trend_frame(trends)
     distribution_data = distribution_frame(distribution)
+    trend_spec = trend_chart(trends).to_dict()
     chart_spec = distribution_chart(distribution).to_dict()
 
     assert list(entries_data.columns) == ["User", "Mood", "Comment", "Date", "Updated"]
     assert trend_data.iloc[0]["Score"] == 2.5
     assert distribution_data.iloc[0]["Count"] == 2
+    assert trend_spec["encoding"]["y"]["scale"]["domain"] == [0, 3]
     assert chart_spec["encoding"]["y"]["scale"]["domainMin"] == 0
 
 
