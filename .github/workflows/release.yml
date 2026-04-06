@@ -4,30 +4,41 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-release:
+  release-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.5
 
       - name: Install dependencies
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          export PATH="$HOME/.local/bin:$PATH"
-          poetry install
+        run: poetry install --no-interaction
 
-      - name: Check required endpoints
+      - name: Validate release endpoints
         run: |
-          python - <<EOF
-          from src import main  # FastAPI app
-          required = ["/submit_mood", "/get_moods", "/stats", "/barplot", "/aggregate", "/filter"]
-          existing = [r.path for r in main.app.routes]
-          missing = [ep for ep in required if ep not in existing]
+          poetry run python - <<'PY'
+          from team_mood_tracker.backend.main import app
+
+          required_paths = {
+              "/entries",
+              "/entries/{entry_id}",
+              "/analytics/trends",
+              "/analytics/distribution",
+              "/analytics/summary",
+              "/health",
+          }
+          existing_paths = {route.path for route in app.routes}
+          missing = required_paths - existing_paths
           if missing:
-              print(f"Missing endpoints: {missing}")
-              exit(1)
-          EOF
+              raise SystemExit(f"Missing paths: {sorted(missing)}")
+          PY
+
+      - name: Run tests
+        run: poetry run pytest

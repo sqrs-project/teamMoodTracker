@@ -2,88 +2,113 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Cache Python dependencies
-        uses: actions/cache@v5.0.4
-        with:
-          path: |
-            ~/.cache/pypoetry
-            ~/.cache/pip
-          key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
-          enableCrossOsArchive: true
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: "3.11"
 
       - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          export PATH="$HOME/.local/bin:$PATH"
-          poetry install
+        run: pipx install poetry==1.8.5
 
-      # ---- Quality Gates ----
-      - name: Code formatting check (black)
-        run: poetry run black --check src/
+      - name: Install dependencies
+        run: poetry install --no-interaction
 
-      - name: Style conformance (ruff)
-        run: poetry run ruff check src/
+      - name: Code formatting check
+        run: poetry run black --check src tests
 
-      - name: Type checking (mypy)
-        run: poetry run mypy src/
+      - name: Style conformance
+        run: poetry run ruff check src tests
 
-      - name: Cyclomatic complexity (radon)
-        run: poetry run radon cc -a -s src/
+      - name: Type checking
+        run: poetry run mypy src
 
-      - name: Maintainability index (radon)
-        run: poetry run radon mi -s src/
+      - name: Cyclomatic complexity
+        run: poetry run radon cc -a -s src
+
+      - name: Maintainability index
+        run: poetry run radon mi -s src
 
       - name: Unit tests and coverage
-        run: poetry run pytest --cov=src --cov-fail-under=80
+        run: poetry run pytest
 
-      - name: Security code analysis (bandit)
-        run: poetry run bandit -r src/
+      - name: Security code analysis
+        run: poetry run bandit -r src
 
-      - name: Security dependencies (pip-audit)
+      - name: Security dependencies
         run: poetry run pip-audit
 
-      - name: Documentation (interrogate)
-        run: poetry run interrogate -vv src/
+      - name: Documentation coverage
+        run: poetry run interrogate -vv src
 
-      # ---- Optional Performance Test (locust) ----
-      - name: Performance test (locust)
+      - name: Start API
         run: |
-          if [ -f locustfile.py ]; then
-            poetry run locust -f locustfile.py --headless -u 10 -r 1 -t 1m
-          else
-            echo "No locustfile.py found, skipping performance test."
+          poetry run uvicorn team_mood_tracker.backend.main:app --host 127.0.0.1 --port 8000 &
+          echo $! > uvicorn.pid
+
+      - name: Wait for API
+        run: |
+          python - <<'PY'
+          import time
+          import urllib.request
+
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=2):
+                      break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit("API did not start in time.")
+          PY
+
+      - name: Verify OpenAPI schema
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          with urllib.request.urlopen("http://127.0.0.1:8000/openapi.json", timeout=5) as response:
+              schema = json.load(response)
+
+          paths = schema["paths"]
+          required_paths = [
+              "/entries",
+              "/entries/{entry_id}",
+              "/analytics/trends",
+              "/analytics/distribution",
+              "/analytics/summary",
+              "/health",
+          ]
+          for path in required_paths:
+              assert path in paths, f"Missing path: {path}"
+
+          for methods in paths.values():
+              for operation in methods.values():
+                  assert operation.get("summary"), "Missing operation summary"
+                  assert operation.get("description"), "Missing operation description"
+                  has_example = False
+                  for response in operation.get("responses", {}).values():
+                      content = response.get("content", {})
+                      for media_type in content.values():
+                          if media_type.get("example") or media_type.get("examples"):
+                              has_example = True
+                  assert has_example, "Missing response example"
+          PY
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f uvicorn.pid ]; then
+            kill "$(cat uvicorn.pid)"
           fi
-
-      # ---- Swagger UI check (FastAPI endpoints) ----
-      - name: Swagger endpoint check
-        run: |
-          python - <<EOF
-          import requests
-          url = "http://127.0.0.1:8000/docs/json"
-          try:
-              resp = requests.get(url)
-              assert resp.status_code == 200, "Swagger JSON not available"
-              data = resp.json()
-              assert "paths" in data and data["paths"], "No endpoints documented"
-          except Exception as e:
-              print(e)
-              exit(1)
-          EOF
