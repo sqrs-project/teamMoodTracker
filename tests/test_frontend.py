@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from team_mood_tracker.frontend.presenters import (
+    distribution_chart,
     distribution_frame,
     entries_frame,
     format_mood,
@@ -55,10 +56,12 @@ def test_presenters_build_expected_dataframes() -> None:
     entries_data = entries_frame(entries)
     trend_data = trend_frame(trends)
     distribution_data = distribution_frame(distribution)
+    chart_spec = distribution_chart(distribution).to_dict()
 
     assert list(entries_data.columns) == ["User", "Mood", "Comment", "Date", "Updated"]
     assert trend_data.iloc[0]["Score"] == 2.5
     assert distribution_data.iloc[0]["Count"] == 2
+    assert chart_spec["encoding"]["y"]["scale"]["domainMin"] == 0
 
 
 def test_presenters_handle_mood_formatting_and_ranges() -> None:

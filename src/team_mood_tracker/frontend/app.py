@@ -8,6 +8,7 @@ import streamlit as st
 
 from team_mood_tracker.frontend.api_client import ApiClientError, MoodApiClient
 from team_mood_tracker.frontend.presenters import (
+    distribution_chart,
     distribution_frame,
     entries_frame,
     format_mood,
@@ -223,7 +224,7 @@ def _render_team_charts(  # pragma: no cover
         if distribution_data.empty or int(distribution_data["Count"].sum()) == 0:
             st.info("No distribution data yet.")
         else:
-            st.bar_chart(distribution_data.set_index("Mood"))
+            st.altair_chart(distribution_chart(distribution), use_container_width=True)
 
 
 def _render_optional_user_trend(  # pragma: no cover

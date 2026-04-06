@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import altair as alt
 import pandas as pd
 
 from team_mood_tracker.shared.constants import Mood
@@ -63,6 +64,22 @@ def distribution_frame(distribution: DistributionResponse) -> pd.DataFrame:
         for item in distribution.items
     ]
     return pd.DataFrame(rows)
+
+
+def distribution_chart(distribution: DistributionResponse) -> alt.Chart:
+    """Build a zero-based bar chart for the mood distribution."""
+
+    data = distribution_frame(distribution)
+    return (
+        alt.Chart(data)
+        .mark_bar()
+        .encode(
+            x=alt.X("Mood:N", sort=None, title="Mood"),
+            y=alt.Y("Count:Q", scale=alt.Scale(domainMin=0), title="Count"),
+            tooltip=["Mood:N", "Count:Q"],
+        )
+        .properties(height=320)
+    )
 
 
 def range_to_dates(option: str, today: date) -> tuple[date | None, date | None]:
