@@ -6,6 +6,8 @@ from datetime import date
 
 from fastapi.testclient import TestClient
 
+from team_mood_tracker.shared.constants import MAX_COMMENT_LENGTH
+
 
 def test_entry_crud_flow(client: TestClient) -> None:
     """The API should support create, list, fetch, and delete flows."""
@@ -74,3 +76,31 @@ def test_entries_endpoint_applies_query_filters(client: TestClient) -> None:
 
     assert filtered_response.status_code == 200
     assert filtered_response.json()["total"] == 1
+
+
+def test_create_entry_rejects_invalid_payloads(client: TestClient) -> None:
+    """The API should validate required fields and enum values."""
+
+    blank_user_response = client.post(
+        "/entries",
+        json={"user": "   ", "mood": "happy", "comment": None},
+    )
+    invalid_mood_response = client.post(
+        "/entries",
+        json={"user": "Alice", "mood": "excited", "comment": None},
+    )
+    long_comment_response = client.post(
+        "/entries",
+        json={
+            "user": "Alice",
+            "mood": "happy",
+            "comment": "x" * (MAX_COMMENT_LENGTH + 1),
+        },
+    )
+
+    assert blank_user_response.status_code == 422
+    assert any(item["loc"][-1] == "user" for item in blank_user_response.json()["detail"])
+    assert invalid_mood_response.status_code == 422
+    assert any(item["loc"][-1] == "mood" for item in invalid_mood_response.json()["detail"])
+    assert long_comment_response.status_code == 422
+    assert any(item["loc"][-1] == "comment" for item in long_comment_response.json()["detail"])
