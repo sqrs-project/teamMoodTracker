@@ -1,6 +1,6 @@
 # Team Mood Tracker
 
-Team Mood Tracker is a lightweight internal tool for agile teams to record one mood per user per day and review historical well-being trends. The stack is FastAPI + Streamlit + SQLite, with Poetry for dependency management and Docker for deployment.
+**Team Mood Tracker** is a lightweight internal tool for agile teams to record one mood per user per day and review historical well-being trends. The stack is *FastAPI* + *Streamlit* + *SQLite*, with *Poetry* for dependency management.
 
 ## What It Does
 
