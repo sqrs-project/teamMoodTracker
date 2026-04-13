@@ -89,3 +89,5 @@ The repository includes:
 They validate formatting, linting, typing, coverage, security, docstrings, and OpenAPI documentation completeness.
 
 The `main` branch is protected and requires the `ci` check to pass before merge.
+
+
