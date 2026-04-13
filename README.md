@@ -87,3 +87,7 @@ The repository includes:
 - [Release workflow](/Users/vladkuznetsov/inno/teamMoodTracker/.github/workflows/release.yml)
 
 They validate formatting, linting, typing, coverage, security, docstrings, and OpenAPI documentation completeness.
+
+The `main` branch is protected and requires the `ci` check to pass before merge.
+
+
